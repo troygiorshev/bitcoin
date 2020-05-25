@@ -57,7 +57,6 @@ class InvalidMessagesTest(BitcoinTestFramework):
            messages are ignored.
         """
         self.test_magic_bytes()
-        self.test_checksum()
         self.test_size()
         self.test_msgtype()
         self.test_large_inv()
@@ -171,21 +170,6 @@ class InvalidMessagesTest(BitcoinTestFramework):
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
 
-    def test_checksum(self):
-        conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['CHECKSUM ERROR (badmsg, 2 bytes), expected 78df0a04 was ffffffff']):
-            msg = conn.build_message(msg_unrecognized(str_data="d"))
-            cut_len = (
-                4 +  # magic
-                12 +  # msgtype
-                4  #len
-            )
-            # modify checksum
-            msg = msg[:cut_len] + b'\xff' * 4 + msg[cut_len + 4:]
-            self.nodes[0].p2p.send_raw_message(msg)
-            conn.sync_with_ping(timeout=1)
-            self.nodes[0].disconnect_p2ps()
-
     def test_size(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
         with self.nodes[0].assert_debug_log(['']):
@@ -214,13 +198,13 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_large_inv(self):
         conn = self.nodes[0].add_p2p_connection(P2PInterface())
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (0 -> 20): message inv size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=3 (0 -> 20): message inv size() = 50001']):
             msg = msg_inv([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (20 -> 40): message getdata size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=3 (20 -> 40): message getdata size() = 50001']):
             msg = msg_getdata([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (40 -> 60): headers message size = 2001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=3 (40 -> 60): headers message size = 2001']):
             msg = msg_headers([CBlockHeader()] * 2001)
             conn.send_and_ping(msg)
         self.nodes[0].disconnect_p2ps()
