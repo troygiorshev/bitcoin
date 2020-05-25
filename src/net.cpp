@@ -1414,7 +1414,7 @@ void CConnman::SocketHandler()
                     auto it(pnode->vRecvMsg.begin());
                     for (; it != pnode->vRecvMsg.end(); ++it) {
                         // vRecvMsg contains only completed CNetMessage
-                        // the single possible partially deserialized message are held by TransportDeserializer
+                        // the single possible partially deserialized message is held by something implementing TransportDeserializer
                         nSizeAdded += it->m_raw_message_size;
                     }
                     {

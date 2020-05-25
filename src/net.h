@@ -53,8 +53,6 @@ static const int TIMEOUT_INTERVAL = 20 * 60;
 static const int FEELER_INTERVAL = 120;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
-/** Maximum length of incoming protocol messages (no message over 4 MB is currently acceptable). */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 4 * 1000 * 1000;
 /** Maximum length of the user agent string in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 /** Maximum number of automatic outgoing nodes over which we'll relay everything (blocks, tx, addrs, etc) */
@@ -633,13 +631,13 @@ public:
  */
 class TransportDeserializer {
 public:
-    // returns true if the current deserialization is complete
+    // return true if the current deserialization is complete
     virtual bool Complete() const = 0;
     // set the serialization context version
     virtual void SetVersion(int version) = 0;
-    // read and deserialize data
+    // read and deserialize data, return -1 if the peer should be dropped
     virtual int Read(const char *data, unsigned int bytes) = 0;
-    // decomposes a message from the context
+    // decompose a message from the context
     virtual boost::optional<CNetMessage> GetMessage(int64_t time) = 0;
     virtual ~TransportDeserializer() {}
 };

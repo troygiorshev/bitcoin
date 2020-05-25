@@ -129,7 +129,12 @@ class InvalidMessagesTest(BitcoinTestFramework):
         msg = msg_unrecognized(str_data="b" * actual_size)
 
         # TODO: handle larger-than cases. I haven't been able to pin down what behavior to expect.
-        for wrong_size in (2, 77, 78, 79):
+        # The following is the observed behavior from master, head 24f702
+        # 2 - Succeeds in deserializing header, but fails on the max size check, so disconnect
+        # 77 - Succeeds in deserializing header, but fails on the max size check, so disconnect
+        # 78 - Succeeds in deserializing header, but fails on the max size check, so disconnect.
+        # 79- Succeeds in deserializing header, but fails on the max size check, so disconnect.  Size 1650614882
+        for wrong_size in (2, 77, 78):
             self.log.info("Sending a message with incorrect size of {}".format(wrong_size))
 
             # Unmodified message should submit okay.
