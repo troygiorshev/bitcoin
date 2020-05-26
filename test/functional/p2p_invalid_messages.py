@@ -166,7 +166,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
         # we might run into races later on
         asyncio.run_coroutine_threadsafe(swap_magic_bytes(), NetworkThread.network_event_loop).result()
 
-        with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: INVALID MESSAGESTART ping']):
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - MESSAGESTART']):
             conn.send_message(msg_ping(nonce=0xff))
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
@@ -188,23 +188,17 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_size(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['']):
-            msg = conn.build_message(msg_unrecognized(str_data="d"))
-            cut_len = (
-                4 +  # magic
-                12  # msgtype
-            )
-            # modify len to MAX_SIZE + 1
-            msg = msg[:cut_len] + struct.pack("<I", 0x02000000 + 1) + msg[cut_len + 4:]
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - SIZE']):
+            # Create a message with PAYLOAD SIZE >= MAX_SIZE + 1
+            msg = conn.build_message(msg_unrecognized(str_data="d"*(0x02000000 + 1)))
             self.nodes[0].p2p.send_raw_message(msg)
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
 
     def test_msgtype(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: ERRORS IN HEADER']):
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - COMMAND']):
             msg = msg_unrecognized(str_data="d")
-            msg.msgtype = b'\xff' * 12
             msg = conn.build_message(msg)
             # Modify msgtype
             msg = msg[:7] + b'\x00' + msg[7 + 1:]
