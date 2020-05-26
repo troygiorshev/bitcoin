@@ -616,7 +616,6 @@ public:
     int64_t m_time = 0;                  // time (in microseconds) of message receipt.
     bool m_valid_netmagic = false;
     bool m_valid_header = false;
-    bool m_valid_checksum = false;
     uint32_t m_message_size = 0;         // size of the payload
     uint32_t m_raw_message_size = 0;     // used wire size of the message (including header/checksum)
     std::string m_command;
@@ -642,7 +641,7 @@ public:
     // read and deserialize data
     virtual int Read(const char *data, unsigned int bytes) = 0;
     // decomposes a message from the context
-    virtual CNetMessage GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) = 0;
+    virtual boost::optional<CNetMessage> GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) = 0;
     virtual ~TransportDeserializer() {}
 };
 
@@ -695,7 +694,7 @@ public:
         if (ret < 0) Reset();
         return ret;
     }
-    CNetMessage GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) override;
+    boost::optional<CNetMessage> GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) override;
 };
 
 /** The TransportSerializer prepares messages for the network transport
