@@ -109,7 +109,12 @@ std::string CMessageHeader::GetCommand() const
     return std::string(pchCommand, pchCommand + strnlen(pchCommand, COMMAND_SIZE));
 }
 
-bool CMessageHeader::IsValid(const MessageStartChars& pchMessageStartIn) const
+std::string CMessageHeader::GetMessageStart() const
+{
+    return std::string(pchMessageStart, pchMessageStart + strnlen(pchMessageStart, MESSAGE_START_SIZE));
+}
+
+bool CMessageHeader::IsValid() const
 {
     // Check start string
     if (memcmp(pchMessageStart, pchMessageStartIn, MESSAGE_START_SIZE) != 0)
