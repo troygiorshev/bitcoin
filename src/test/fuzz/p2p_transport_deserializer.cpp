@@ -38,12 +38,6 @@ void test_one_input(const std::vector<uint8_t>& buffer)
                 assert(msg.m_raw_message_size <= buffer.size());
                 assert(msg.m_raw_message_size == CMessageHeader::HEADER_SIZE + msg.m_message_size);
                 assert(msg.m_time == m_time);
-                if (msg.m_valid_header) {
-                    assert(msg.m_valid_netmagic);
-                }
-                if (!msg.m_valid_netmagic) {
-                    assert(!msg.m_valid_header);
-                }
             }
         }
     }

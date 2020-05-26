@@ -678,11 +678,19 @@ int V1TransportDeserializer::readHeader(const char *pch, unsigned int nBytes)
         hdrbuf >> hdr;
     }
     catch (const std::exception&) {
+        LogPrint(BCLog::NET, "HEADER ERROR - UNABLE TO DESERIALIZE\n");
+        return -1;
+    }
+
+    // Check start string, network magic
+    if (memcmp(hdr.pchMessageStart, m_chain_params.MessageStart(), CMessageHeader::MESSAGE_START_SIZE) != 0) {
+        LogPrint(BCLog::NET, "HEADER ERROR - MESSAGESTART (%s, %u bytes), got %s\n", hdr.GetCommand(), hdr.nMessageSize + CMessageHeader::HEADER_SIZE, hdr.GetMessageStart());
         return -1;
     }
 
     // reject messages larger than MAX_SIZE or MAX_PROTOCOL_MESSAGE_LENGTH
     if (hdr.nMessageSize > MAX_SIZE || hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH) {
+        LogPrint(BCLog::NET, "HEADER ERROR - SIZE (%s, %u bytes)\n", hdr.GetCommand(), hdr.nMessageSize + CMessageHeader::HEADER_SIZE);
         return -1;
     }
 
@@ -721,9 +729,11 @@ Optional<CNetMessage> V1TransportDeserializer::GetMessage(int64_t time) {
     // decompose a single CNetMessage from the TransportDeserializer
     CNetMessage msg(std::move(vRecv));
 
-    // store state about valid header, netmagic and checksum
-    msg.m_valid_header = hdr.IsValid(m_chain_params.MessageStart());
-    msg.m_valid_netmagic = (memcmp(hdr.pchMessageStart, m_chain_params.MessageStart(), CMessageHeader::MESSAGE_START_SIZE) == 0);
+    // Check the header
+    if (!hdr.IsCommandValid()){
+        Reset();
+        return nullopt;
+    }
 
     // store command string, payload size
     msg.m_command = hdr.GetCommand();
@@ -735,6 +745,7 @@ Optional<CNetMessage> V1TransportDeserializer::GetMessage(int64_t time) {
     // We just received a message off the wire, harvest entropy from the time (and the message checksum)
     RandAddEvent(ReadLE32(hash.begin()));
 
+    // Check checksum
     bool valid_checksum = (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) == 0);
     if (!valid_checksum) {
         LogPrint(BCLog::NET, "CHECKSUM ERROR (%s, %u bytes), expected %s was %s\n",

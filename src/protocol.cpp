@@ -118,12 +118,8 @@ std::string CMessageHeader::GetMessageStart() const
     return std::string(pchMessageStart, pchMessageStart + strnlen(pchMessageStart, MESSAGE_START_SIZE));
 }
 
-bool CMessageHeader::IsValid(const MessageStartChars& pchMessageStartIn) const
+bool CMessageHeader::IsCommandValid() const
 {
-    // Check start string
-    if (memcmp(pchMessageStart, pchMessageStartIn, MESSAGE_START_SIZE) != 0)
-        return false;
-
     // Check the command string for errors
     for (const char* p1 = pchCommand; p1 < pchCommand + COMMAND_SIZE; p1++)
     {
@@ -131,18 +127,15 @@ bool CMessageHeader::IsValid(const MessageStartChars& pchMessageStartIn) const
         {
             // Must be all zeros after the first zero
             for (; p1 < pchCommand + COMMAND_SIZE; p1++)
-                if (*p1 != 0)
+                if (*p1 != 0){
+                    LogPrint(BCLog::NET, "HEADER ERROR - COMMAND (%s, %u bytes)\n", GetCommand(), nMessageSize + HEADER_SIZE);
                     return false;
+                }
         }
-        else if (*p1 < ' ' || *p1 > 0x7E)
+        else if (*p1 < ' ' || *p1 > 0x7E){
+            LogPrint(BCLog::NET, "HEADER ERROR - COMMAND (%s, %u bytes)\n", GetCommand(), nMessageSize + HEADER_SIZE);
             return false;
-    }
-
-    // Message size
-    if (nMessageSize > MAX_SIZE)
-    {
-        LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) nMessageSize > MAX_SIZE\n", GetCommand(), nMessageSize);
-        return false;
+        }
     }
 
     return true;
