@@ -616,8 +616,6 @@ class CNetMessage {
 public:
     CDataStream m_recv;                  // received message data
     int64_t m_time = 0;                  // time (in microseconds) of message receipt.
-    bool m_valid_netmagic = false;
-    bool m_valid_header = false;
     uint32_t m_message_size = 0;         // size of the payload
     uint32_t m_raw_message_size = 0;     // used wire size of the message (including header/checksum)
     std::string m_command;
@@ -651,6 +649,7 @@ class V1TransportDeserializer final : public TransportDeserializer
 {
 private:
     const CChainParams& m_chain_params;
+    const NodeId node_id; // Only for logging
     mutable CHash256 hasher;
     mutable uint256 data_hash;
     bool in_data;                   // parsing header (false) or data (true)
@@ -676,7 +675,7 @@ private:
     }
 
 public:
-    V1TransportDeserializer(const CChainParams& chain_params_in, int nTypeIn, int nVersionIn) : m_chain_params(chain_params_in), hdrbuf(nTypeIn, nVersionIn), vRecv(nTypeIn, nVersionIn)
+    V1TransportDeserializer(const CChainParams& chain_params_in, const NodeId node_id_in, int nTypeIn, int nVersionIn) : m_chain_params(chain_params_in), node_id(node_id_in), hdrbuf(nTypeIn, nVersionIn), vRecv(nTypeIn, nVersionIn)
     {
         Reset();
     }

@@ -19,7 +19,8 @@ void initialize()
 
 void test_one_input(const std::vector<uint8_t>& buffer)
 {
-    V1TransportDeserializer deserializer{Params(), SER_NETWORK, INIT_PROTO_VERSION};
+    // Construct deserializer, with a dummy NodeId
+    V1TransportDeserializer deserializer{Params(), (NodeId)0, SER_NETWORK, INIT_PROTO_VERSION};
     const char* pch = (const char*)buffer.data();
     size_t n_bytes = buffer.size();
     while (n_bytes > 0) {
@@ -38,12 +39,6 @@ void test_one_input(const std::vector<uint8_t>& buffer)
                 assert(msg.m_raw_message_size <= buffer.size());
                 assert(msg.m_raw_message_size == CMessageHeader::HEADER_SIZE + msg.m_message_size);
                 assert(msg.m_time == m_time);
-                if (msg.m_valid_header) {
-                    assert(msg.m_valid_netmagic);
-                }
-                if (!msg.m_valid_netmagic) {
-                    assert(!msg.m_valid_header);
-                }
             }
         }
     }

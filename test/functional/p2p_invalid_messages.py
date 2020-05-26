@@ -77,7 +77,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_magic_bytes(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: INVALID MESSAGESTART badmsg']):
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - MESSAGESTART (badmsg, 2 bytes), received ffffffff']):
             msg = conn.build_message(msg_unrecognized(str_data="d"))
             # modify magic bytes
             msg = b'\xff' * 4 + msg[4:]
@@ -99,7 +99,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_size(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['']):
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - SIZE (badmsg, 4000001 bytes)']):
             # Create a message with oversized payload
             msg = msg_unrecognized(str_data="d" * (VALID_DATA_LIMIT + 1))
             msg = conn.build_message(msg)
@@ -109,9 +109,8 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_msgtype(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: ERRORS IN HEADER']):
+        with self.nodes[0].assert_debug_log(['HEADER ERROR - COMMAND']):
             msg = msg_unrecognized(str_data="d")
-            msg.msgtype = b'\xff' * 12
             msg = conn.build_message(msg)
             # Modify msgtype
             msg = msg[:7] + b'\x00' + msg[7 + 1:]
