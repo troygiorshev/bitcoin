@@ -124,7 +124,8 @@ class InvalidMessagesTest(BitcoinTestFramework):
         #
         # Send messages with an incorrect data size in the header.
         #
-        actual_size = 100
+        # These all fail with a checksum error!  That's not what this test is supposed to test.
+        actual_size = 100   # This is not the actual size of the payload.  Serialization adds (in this case) one byte
         msg = msg_unrecognized(str_data="b" * actual_size)
 
         # TODO: handle larger-than cases. I haven't been able to pin down what behavior to expect.
@@ -134,11 +135,21 @@ class InvalidMessagesTest(BitcoinTestFramework):
             # Unmodified message should submit okay.
             node.p2p.send_and_ping(msg)
 
+            ## elucidate the confusion below
+            #print(len(node.p2p.build_message(msg))) # 125
+            # => Payload size = 125 - 24 = 101
+            # If we take 77 bytes, then there are 101 - 77 = 24 left
+            # That's exactly the size of a header
+            # So, bitcoind deserializes the header and rejects it for some other reason
+            # But, if we take 78 bytes, then there are 101 - 78 = 23 left
+            # That's not enough to fill a header, so, what happens?
+
             # A message lying about its data size results in a disconnect when the incorrect
             # data size is less than the actual size.
             #
             # TODO: why does behavior change at 78 bytes?
             #
+            # Answer: See above
             node.p2p.send_raw_message(self._tweak_msg_data_size(msg, wrong_size))
 
             # For some reason unknown to me, we sometimes have to push additional data to the
