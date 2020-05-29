@@ -589,25 +589,30 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
     while (nBytes > 0) {
         // absorb network data
         int handled = m_deserializer->Read(pch, nBytes);
-        if (handled < 0) return false;
+        if (handled < 0) {
+            return false;
+        }
 
         pch += handled;
         nBytes -= handled;
 
         if (m_deserializer->Complete()) {
             // decompose a transport agnostic CNetMessage from the deserializer
-            CNetMessage msg = m_deserializer->GetMessage(Params().MessageStart(), nTimeMicros);
+            Optional<CNetMessage> result{m_deserializer->GetMessage(Params().MessageStart(), nTimeMicros)};
+            if (!result) {
+                continue;
+            }
 
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
-            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.m_command);
+            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(result->m_command);
             if (i == mapRecvBytesPerMsgCmd.end())
                 i = mapRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
             assert(i != mapRecvBytesPerMsgCmd.end());
-            i->second += msg.m_raw_message_size;
+            i->second += result->m_raw_message_size;
 
             // push the message to the process queue,
-            vRecvMsg.push_back(std::move(msg));
+            vRecvMsg.push_back(std::move(*result));
 
             complete = true;
         }
@@ -699,37 +704,38 @@ const uint256& V1TransportDeserializer::GetMessageHash() const
     return data_hash;
 }
 
-CNetMessage V1TransportDeserializer::GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) {
+Optional<CNetMessage> V1TransportDeserializer::GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time)
+{
     // decompose a single CNetMessage from the TransportDeserializer
     CNetMessage msg(std::move(vRecv));
+    Optional<CNetMessage> result{};
 
     // store state about valid header, netmagic and checksum
     msg.m_valid_header = hdr.IsValid(message_start);
     msg.m_valid_netmagic = (memcmp(hdr.pchMessageStart, message_start, CMessageHeader::MESSAGE_START_SIZE) == 0);
     uint256 hash = GetMessageHash();
 
-    // store command string, payload size
+    // store command string, time, and sizes
     msg.m_command = hdr.GetCommand();
+    msg.m_time = time;
     msg.m_message_size = hdr.nMessageSize;
     msg.m_raw_message_size = hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
 
     // We just received a message off the wire, harvest entropy from the time (and the message checksum)
     RandAddEvent(ReadLE32(hash.begin()));
 
-    msg.m_valid_checksum = (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) == 0);
-    if (!msg.m_valid_checksum) {
+    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0) {
         LogPrint(BCLog::NET, "CHECKSUM ERROR (%s, %u bytes), expected %s was %s\n",
                  SanitizeString(msg.m_command), msg.m_message_size,
                  HexStr(hash.begin(), hash.begin()+CMessageHeader::CHECKSUM_SIZE),
                  HexStr(hdr.pchChecksum, hdr.pchChecksum+CMessageHeader::CHECKSUM_SIZE));
+    } else {
+        result = std::move(msg);
     }
 
-    // store receive time
-    msg.m_time = time;
-
-    // reset the network deserializer (prepare for the next message)
+    // Always reset the network deserializer (prepare for the next message)
     Reset();
-    return msg;
+    return result;
 }
 
 void V1TransportSerializer::prepareForTransport(CSerializedNetMsg& msg, std::vector<unsigned char>& header) {
