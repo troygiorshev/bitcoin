@@ -59,6 +59,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
         self.test_magic_bytes()
         self.test_checksum()
         self.test_size()
+        self.test_weird_sizes()
         self.test_msgtype()
         self.test_large_inv()
 
@@ -199,6 +200,20 @@ class InvalidMessagesTest(BitcoinTestFramework):
             self.nodes[0].p2p.send_raw_message(msg)
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
+
+    def test_weird_sizes(self):
+        conn = self.nodes[0].add_p2p_connection(P2PDataStore())
+        msg_a = conn.build_message(msg_unrecognized(str_data="d"*5))
+        msg_b = conn.build_message(msg_unrecognized(str_data="d"*10))
+        split_point = 7 # 7 chosen arbitrarily
+        msg_1 = msg_a + msg_b[:split_point]
+        msg_2 = msg_b[split_point:]
+        self.nodes[0].p2p.send_raw_message(msg_1)
+        self.nodes[0].p2p.send_raw_message(msg_2)
+        # Observe that this works perfectly fine
+        # The node doesn't realize that these have been sent in a strange way
+        conn.sync_with_ping(timeout=1)
+        self.nodes[0].disconnect_p2ps()
 
     def test_msgtype(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
