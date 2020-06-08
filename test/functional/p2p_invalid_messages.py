@@ -10,6 +10,7 @@ import sys
 from test_framework.messages import (
     CBlockHeader,
     CInv,
+    msg_generic,
     msg_getdata,
     msg_headers,
     msg_inv,
@@ -60,6 +61,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
         self.test_checksum()
         self.test_size()
         self.test_weird_sizes()
+        self.test_indistinguishable()
         self.test_msgtype()
         self.test_large_inv()
 
@@ -215,6 +217,29 @@ class InvalidMessagesTest(BitcoinTestFramework):
         conn.sync_with_ping(timeout=1)
         self.nodes[0].disconnect_p2ps()
 
+    def test_indistinguishable(self):
+        conn = self.nodes[0].add_p2p_connection(P2PDataStore())
+        msg_base_raw = msg_generic(b'badmsg', data=b'd'*5) # Note 5
+        msg_base = conn.build_message(msg_base_raw)
+        cut_len = (
+            4 +  # magic
+            12  # msgtype
+        )
+        # Fake the size to be 2 smaller, and correct the checksum
+        msg_1 = msg_base[:cut_len] + struct.pack("<I", len(msg_base_raw.serialize()) - 2) + b'\x52\x67\x5e\x0c' +  msg_base[cut_len + 8:]
+        self.log.info("HERE")
+        self.nodes[0].p2p.send_raw_message(msg_1)
+        # The usual connected check no longer works because the messages are misaligned
+        #conn.sync_with_ping(timeout=1)
+        assert self.nodes[0].p2p.is_connected
+        self.nodes[0].disconnect_p2ps()
+        # Make an the same message in a different way
+        msg_2 = conn.build_message(msg_generic(b'badmsg', data=b'd'*(5-2)))
+        conn = self.nodes[0].add_p2p_connection(P2PDataStore())
+        self.nodes[0].p2p.send_raw_message(msg_2)
+        conn.sync_with_ping(timeout=1)
+        self.nodes[0].disconnect_p2ps()
+
     def test_msgtype(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
         with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: ERRORS IN HEADER']):
@@ -229,13 +254,13 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_large_inv(self):
         conn = self.nodes[0].add_p2p_connection(P2PInterface())
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (0 -> 20): message inv size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=6 (0 -> 20): message inv size() = 50001']):
             msg = msg_inv([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (20 -> 40): message getdata size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=6 (20 -> 40): message getdata size() = 50001']):
             msg = msg_getdata([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (40 -> 60): headers message size = 2001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=6 (40 -> 60): headers message size = 2001']):
             msg = msg_headers([CBlockHeader()] * 2001)
             conn.send_and_ping(msg)
         self.nodes[0].disconnect_p2ps()
