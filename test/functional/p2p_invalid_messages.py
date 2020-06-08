@@ -10,6 +10,7 @@ import sys
 from test_framework.messages import (
     CBlockHeader,
     CInv,
+    msg_generic,
     msg_getdata,
     msg_headers,
     msg_inv,
@@ -59,6 +60,7 @@ class InvalidMessagesTest(BitcoinTestFramework):
         self.test_magic_bytes()
         self.test_checksum()
         self.test_size()
+        self.test_bitflips()
         self.test_msgtype()
         self.test_large_inv()
 
@@ -200,6 +202,40 @@ class InvalidMessagesTest(BitcoinTestFramework):
             conn.wait_for_disconnect(timeout=1)
             self.nodes[0].disconnect_p2ps()
 
+    def test_bitflips(self):
+        '''Make two reasonable messages who, when two bits are flipped,
+        will have header size errors, but in the end won't result in a disconnect
+        nor a misalignment of future messages
+        '''
+        conn = self.nodes[0].add_p2p_connection(P2PDataStore())
+        # This first message could possibly be an inv message
+        # where the last 4 bytes of the last inventory entry's TXID
+        # are the same as the current netmagic
+        # I'll use a fake "somedata" instead
+        msg_1 = msg_generic(msgtype=b'somedata', data=b'somejunk\xfa\xbf\xb5\xda')
+        msg_1 = conn.build_message(msg_1)
+        # This second message could very well be a mempool message
+        # The test suite just isn't set up to respond to it
+        # (And I'm not debugging that just for this proof of concept)
+        # I'll use a fake "emptymsg" instead
+        msg_2 = msg_generic(msgtype=b'emptymsg', data=b'')
+        msg_2 = conn.build_message(msg_2)
+        # First check that these messages don't cause a disconnect
+        self.nodes[0].p2p.send_raw_message(msg_1)
+        self.nodes[0].p2p.send_raw_message(msg_2)
+        conn.sync_with_ping(timeout=1)
+        # Now, modify each message with a single bitflip
+        # Bitwise operations in python are great...
+        msg_1 = msg_1[:16] + (msg_1[16] ^ 0b00000100).to_bytes(1, 'little') + msg_1[17:]  # The 6th bit in the payload size field
+        msg_2 = msg_2[:12] + (msg_2[12] ^ 0b00000100).to_bytes(1, 'little') + msg_2[13:]  # The 6th bit in the 9th byte of the command name
+        # Again send them both
+        self.nodes[0].p2p.send_raw_message(msg_1)
+        self.nodes[0].p2p.send_raw_message(msg_2)
+        # Verify that not only is the node not disconnected
+        # But additionally the messages aren't misaligned, as it responds to a ping
+        conn.sync_with_ping(timeout=1)
+        self.nodes[0].disconnect_p2ps()
+
     def test_msgtype(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
         with self.nodes[0].assert_debug_log(['PROCESSMESSAGE: ERRORS IN HEADER']):
@@ -214,13 +250,13 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_large_inv(self):
         conn = self.nodes[0].add_p2p_connection(P2PInterface())
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (0 -> 20): message inv size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', '(0 -> 20): message inv size() = 50001']):
             msg = msg_inv([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (20 -> 40): message getdata size() = 50001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', '(20 -> 40): message getdata size() = 50001']):
             msg = msg_getdata([CInv(MSG_TX, 1)] * 50001)
             conn.send_and_ping(msg)
-        with self.nodes[0].assert_debug_log(['Misbehaving', 'peer=4 (40 -> 60): headers message size = 2001']):
+        with self.nodes[0].assert_debug_log(['Misbehaving', '(40 -> 60): headers message size = 2001']):
             msg = msg_headers([CBlockHeader()] * 2001)
             conn.send_and_ping(msg)
         self.nodes[0].disconnect_p2ps()
