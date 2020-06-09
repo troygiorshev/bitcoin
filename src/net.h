@@ -10,6 +10,7 @@
 #include <addrman.h>
 #include <amount.h>
 #include <bloom.h>
+#include <chainparams.h>
 #include <compat.h>
 #include <crypto/siphash.h>
 #include <hash.h>
@@ -642,13 +643,14 @@ public:
     // read and deserialize data
     virtual int Read(const char *data, unsigned int bytes) = 0;
     // decomposes a message from the context
-    virtual Optional<CNetMessage> GetMessage(const CMessageHeader::MessageStartChars& message_start, std::chrono::microseconds time, uint32_t& out_err) = 0;
+    virtual Optional<CNetMessage> GetMessage(std::chrono::microseconds time, uint32_t& out_err) = 0;
     virtual ~TransportDeserializer() {}
 };
 
 class V1TransportDeserializer final : public TransportDeserializer
 {
 private:
+    const CChainParams& m_chain_params;
     const NodeId m_node_id; // Only for logging
     mutable CHash256 hasher;
     mutable uint256 data_hash;
@@ -675,8 +677,9 @@ private:
     }
 
 public:
-    V1TransportDeserializer(const NodeId node_id, int nTypeIn, int nVersionIn)
-        : m_node_id(node_id),
+    V1TransportDeserializer(const CChainParams& chain_params, const NodeId node_id, int nTypeIn, int nVersionIn)
+        : m_chain_params(chain_params),
+          m_node_id(node_id),
           hdrbuf(nTypeIn, nVersionIn),
           vRecv(nTypeIn, nVersionIn)
     {
@@ -699,7 +702,7 @@ public:
         if (ret < 0) Reset();
         return ret;
     }
-    Optional<CNetMessage> GetMessage(const CMessageHeader::MessageStartChars& message_start, std::chrono::microseconds time, uint32_t& out_err) override;
+    Optional<CNetMessage> GetMessage(std::chrono::microseconds time, uint32_t& out_err) override;
 };
 
 /** The TransportSerializer prepares messages for the network transport
