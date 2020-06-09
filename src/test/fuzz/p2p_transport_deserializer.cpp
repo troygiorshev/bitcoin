@@ -19,7 +19,7 @@ void initialize()
 
 void test_one_input(const std::vector<uint8_t>& buffer)
 {
-    V1TransportDeserializer deserializer{Params().MessageStart(), SER_NETWORK, INIT_PROTO_VERSION};
+    V1TransportDeserializer deserializer{Params(), SER_NETWORK, INIT_PROTO_VERSION};
     const char* pch = (const char*)buffer.data();
     size_t n_bytes = buffer.size();
     while (n_bytes > 0) {
@@ -31,7 +31,7 @@ void test_one_input(const std::vector<uint8_t>& buffer)
         n_bytes -= handled;
         if (deserializer.Complete()) {
             const int64_t m_time = std::numeric_limits<int64_t>::max();
-            auto result = deserializer.GetMessage(Params().MessageStart(), m_time);
+            auto result = deserializer.GetMessage(m_time);
             if (result) {
                 const CNetMessage msg = *result;
                 assert(msg.m_command.size() <= CMessageHeader::COMMAND_SIZE);

@@ -10,7 +10,6 @@
 #include <net.h>
 
 #include <banman.h>
-#include <chainparams.h>
 #include <clientversion.h>
 #include <consensus/consensus.h>
 #include <crypto/sha256.h>
@@ -608,7 +607,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
         if (m_deserializer->Complete()) {
             // decompose a transport agnostic CNetMessage from the deserializer
-            Optional<CNetMessage> result{m_deserializer->GetMessage(Params().MessageStart(), nTimeMicros)};
+            Optional<CNetMessage> result{m_deserializer->GetMessage(nTimeMicros)};
             if (!result) {
                 continue;
             }
@@ -714,22 +713,23 @@ const uint256& V1TransportDeserializer::GetMessageHash() const
     return data_hash;
 }
 
-Optional<CNetMessage> V1TransportDeserializer::GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time)
+Optional<CNetMessage> V1TransportDeserializer::GetMessage(int64_t time)
 {
     // decompose a single CNetMessage from the TransportDeserializer
     CNetMessage msg(std::move(vRecv));
     Optional<CNetMessage> result{};
 
     // store state about valid header, netmagic and checksum
-    msg.m_valid_header = hdr.IsValid(message_start);
-    msg.m_valid_netmagic = (memcmp(hdr.pchMessageStart, message_start, CMessageHeader::MESSAGE_START_SIZE) == 0);
-    uint256 hash = GetMessageHash();
+    msg.m_valid_header = hdr.IsValid(m_chain_params.MessageStart());
+    msg.m_valid_netmagic = (memcmp(hdr.pchMessageStart, m_chain_params.MessageStart(), CMessageHeader::MESSAGE_START_SIZE) == 0);
 
     // store command string, time, and sizes
     msg.m_command = hdr.GetCommand();
     msg.m_time = time;
     msg.m_message_size = hdr.nMessageSize;
     msg.m_raw_message_size = hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
+
+    uint256 hash = GetMessageHash();
 
     // We just received a message off the wire, harvest entropy from the time (and the message checksum)
     RandAddEvent(ReadLE32(hash.begin()));
@@ -2793,7 +2793,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
         LogPrint(BCLog::NET, "Added connection peer=%d\n", id);
     }
 
-    m_deserializer = MakeUnique<V1TransportDeserializer>(V1TransportDeserializer(Params().MessageStart(), SER_NETWORK, INIT_PROTO_VERSION));
+    m_deserializer = MakeUnique<V1TransportDeserializer>(V1TransportDeserializer(Params(), SER_NETWORK, INIT_PROTO_VERSION));
     m_serializer = MakeUnique<V1TransportSerializer>(V1TransportSerializer());
 }
 
