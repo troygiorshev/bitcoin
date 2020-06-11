@@ -915,6 +915,8 @@ public:
 
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete);
 
+    void LogMessage(CNetMessage msg);
+
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;

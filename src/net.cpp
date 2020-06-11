@@ -23,6 +23,10 @@
 #include <util/strencodings.h>
 #include <util/translation.h>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <sstream>
+
 #ifdef WIN32
 #include <string.h>
 #else
@@ -606,6 +610,8 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
             assert(i != mapRecvBytesPerMsgCmd.end());
             i->second += msg.m_raw_message_size;
 
+            LogMessage(msg);
+
             // push the message to the process queue,
             vRecvMsg.push_back(std::move(msg));
 
@@ -615,6 +621,27 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
     return true;
 }
+
+void CNode::LogMessage(CNetMessage msg)
+{
+    boost::property_tree::ptree pt;
+    pt.put("time", msg.m_time);
+    pt.put("command", msg.m_command);
+    pt.put("size", msg.m_message_size);
+    pt.put("data", msg.m_recv.str());
+
+    std::stringstream ss;
+
+    boost::property_tree::json_parser::write_json(ss, pt);
+
+    std::ofstream myfile;
+    myfile.open("/home/troy/msg.txt");
+
+    myfile << ss.str() << '\n';
+
+    myfile.close();
+}
+
 
 void CNode::SetSendVersion(int nVersionIn)
 {
