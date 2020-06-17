@@ -23,10 +23,6 @@
 #include <util/strencodings.h>
 #include <util/translation.h>
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <sstream>
-
 #ifdef WIN32
 #include <string.h>
 #else
@@ -610,8 +606,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
             assert(i != mapRecvBytesPerMsgCmd.end());
             i->second += msg.m_raw_message_size;
 
-            LogMessage(msg);
-
             // push the message to the process queue,
             vRecvMsg.push_back(std::move(msg));
 
@@ -620,26 +614,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
     }
 
     return true;
-}
-
-void CNode::LogMessage(CNetMessage msg)
-{
-    boost::property_tree::ptree pt;
-    pt.put("time", msg.m_time);
-    pt.put("command", msg.m_command);
-    pt.put("size", msg.m_message_size);
-    pt.put("data", msg.m_recv.str());
-
-    std::stringstream ss;
-
-    boost::property_tree::json_parser::write_json(ss, pt);
-
-    std::ofstream myfile;
-    myfile.open("/home/troy/msg.txt");
-
-    myfile << ss.str() << '\n';
-
-    myfile.close();
 }
 
 
@@ -2839,6 +2813,8 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
 
         if (pnode->nSendSize > nSendBufferMaxSize)
             pnode->fPauseSend = true;
+        if (gArgs.IsArgSet("-dumpmessages"))
+            LogMessage(pnode, msg.command, msg.data, false);
         pnode->vSendMsg.push_back(std::move(serializedHeader));
         if (nMessageSize)
             pnode->vSendMsg.push_back(std::move(msg.data));
@@ -2890,4 +2866,39 @@ uint64_t CConnman::CalculateKeyedNetGroup(const CAddress& ad) const
     std::vector<unsigned char> vchNetGroup(ad.GetGroup(addrman.m_asmap));
 
     return GetDeterministicRandomizer(RANDOMIZER_ID_NETGROUP).Write(vchNetGroup.data(), vchNetGroup.size()).Finalize();
+}
+
+void LogMessage_V1(CNetMessage msg)
+{
+    std::ofstream f; 
+    f.open("/home/troy/msg.bin", std::ios::binary | std::ios::out);
+
+    f << msg.m_time;
+    f << msg.m_command.data();
+    f << msg.m_message_size;
+    f << msg.m_recv.data();
+
+    f.close();
+}
+
+void LogMessage(CNode* node, std::string command, std::vector<unsigned char> data, bool is_incoming)
+{
+    int64_t time = GetTimeMicros();
+
+    fs::path base_path = GetDataDir()  / "peer_logging" / node->addr.ToString();
+    boost::filesystem::create_directories(base_path);
+
+    fs::path path = base_path / (is_incoming ? "msgs_recv.dat" : "msgs_sent.dat");
+    std::ofstream f(path.c_str(), std::ios::binary | std::ios::out | std::ios::app);
+
+    f << time;
+    f << command.data();
+    for (int i = command.length(); i < CMessageHeader::COMMAND_SIZE; ++i){
+        f << '\0';
+    }
+    uint32_t size = data.size();
+    f.write((char *) &size, sizeof(size));
+    for (auto i : data){
+        f << i;
+    }
 }

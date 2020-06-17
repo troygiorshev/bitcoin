@@ -915,8 +915,6 @@ public:
 
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete);
 
-    void LogMessage(CNetMessage msg);
-
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;
@@ -1016,5 +1014,9 @@ inline std::chrono::microseconds PoissonNextSend(std::chrono::microseconds now, 
 {
     return std::chrono::microseconds{PoissonNextSend(now.count(), average_interval.count())};
 }
+
+void LogMessage_V1(CNetMessage msg);
+
+void LogMessage(CNode* node, std::string command, std::vector<unsigned char> data, bool is_incoming);
 
 #endif // BITCOIN_NET_H
