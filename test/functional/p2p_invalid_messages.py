@@ -43,6 +43,7 @@ class msg_unrecognized:
 class InvalidMessagesTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
+        self.extra_args = [["-dumpmessages"]]
         self.setup_clean_chain = True
 
     def run_test(self):
