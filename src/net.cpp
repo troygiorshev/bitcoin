@@ -596,7 +596,11 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
         if (m_deserializer->Complete()) {
             // decompose a transport agnostic CNetMessage from the deserializer
-            CNetMessage msg = m_deserializer->GetMessage(Params().MessageStart(), nTimeMicros);
+            Optional<CNetMessage> result{m_deserializer->GetMessage(Params().MessageStart(), nTimeMicros)};
+            if (!result) {
+                continue;
+            }
+            CNetMessage msg{*result};
 
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
@@ -699,9 +703,10 @@ const uint256& V1TransportDeserializer::GetMessageHash() const
     return data_hash;
 }
 
-CNetMessage V1TransportDeserializer::GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) {
+Optional<CNetMessage> V1TransportDeserializer::GetMessage(const CMessageHeader::MessageStartChars& message_start, int64_t time) {
     // decompose a single CNetMessage from the TransportDeserializer
     CNetMessage msg(std::move(vRecv));
+    Optional<CNetMessage> result{};
 
     // store state about valid header, netmagic and checksum
     msg.m_valid_header = hdr.IsValid(message_start);
@@ -729,7 +734,8 @@ CNetMessage V1TransportDeserializer::GetMessage(const CMessageHeader::MessageSta
 
     // reset the network deserializer (prepare for the next message)
     Reset();
-    return msg;
+    result = msg;
+    return result;
 }
 
 void V1TransportSerializer::prepareForTransport(CSerializedNetMsg& msg, std::vector<unsigned char>& header) {
