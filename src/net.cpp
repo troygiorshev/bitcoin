@@ -613,6 +613,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
                 // Message deserialization failed.  Drop the message but don't disconnect the peer.
                 continue;
             }
+            LogPrintf("TROY addr %p size %u\n", result->m_recv.data(), result->m_recv.size());
 
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
@@ -729,6 +730,11 @@ Optional<CNetMessage> V1TransportDeserializer::GetMessage(int64_t time)
     CNetMessage msg(std::move(vRecv));
     Optional<CNetMessage> result{};
 
+    LogPrintf("CNetMessage move constructable? %s\n", std::is_move_constructible<CNetMessage>::value ? "true" : "false");
+    LogPrintf("CNetMessage move assignable? %s\n", std::is_move_assignable<CNetMessage>::value ? "true" : "false");
+    LogPrintf("CNetMessage copy constructable? %s\n", std::is_copy_constructible<CNetMessage>::value ? "true" : "false");
+    LogPrintf("CNetMessage copy assignable? %s\n", std::is_copy_assignable<CNetMessage>::value ? "true" : "false");
+
     // store command string, time, and sizes
     msg.m_command = hdr.GetCommand();
     msg.m_time = time;
@@ -751,7 +757,10 @@ Optional<CNetMessage> V1TransportDeserializer::GetMessage(int64_t time)
         LogPrint(BCLog::NET, "HEADER ERROR - COMMAND (%s, %u bytes), peer=%d\n",
             hdr.GetCommand(), msg.m_message_size, node_id);
     } else {
+        LogPrintf("TROY addr %p size %u\n", msg.m_recv.data(), msg.m_recv.size());
         result = std::move(msg);
+        LogPrintf("TROY addr %p size %u\n", msg.m_recv.data(), msg.m_recv.size());
+        LogPrintf("TROY addr %p size %u\n", result->m_recv.data(), result->m_recv.size());
     }
 
     // Always reset the network deserializer (prepare for the next message)
