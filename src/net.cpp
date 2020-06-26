@@ -2891,7 +2891,7 @@ void LogMessage(CNode* node, std::string command, std::vector<unsigned char> dat
     fs::path path = base_path / (is_incoming ? "msgs_recv.dat" : "msgs_sent.dat");
     std::ofstream f(path.c_str(), std::ios::binary | std::ios::out | std::ios::app);
 
-    f << time;
+    f.write((char *) &time, sizeof(time));
     f << command.data();
     for (int i = command.length(); i < CMessageHeader::COMMAND_SIZE; ++i){
         f << '\0';
