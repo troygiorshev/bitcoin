@@ -5,16 +5,18 @@ Dostring here
 
 """
 
-from typing import Any
-import json
-import pathlib
-from io import BytesIO
-
 import sys
+
 sys.path.append('test/functional')
 
 from test_framework.messages import *
 from test_framework.mininode import MESSAGEMAP
+
+import argparse
+from typing import Any, List
+import json
+from pathlib import Path
+from io import BytesIO
 
 TIME_SIZE = 8
 LENGTH_SIZE = 4
@@ -41,8 +43,7 @@ def to_jsonable(obj: Any) -> Any:
     return ret
 
 
-def process_file(path: pathlib.Path) -> None:
-    messages = [] # type: List[Message]
+def process_file(path: Path, messages: List[Any], recv: bool) -> None:
     with open(path, 'rb') as f_in:
         while True:
             tmp_header = f_in.read(TIME_SIZE + LENGTH_SIZE + COMMAND_SIZE)
@@ -59,23 +60,33 @@ def process_file(path: pathlib.Path) -> None:
             msg_dict = to_jsonable(msg)
             msg_dict["time"] = time
             msg_dict["length"] = length
+            msg_dict["recv"] = recv
             messages.append(msg_dict)
-    jsonrep = json.dumps(messages)
-    with open(path.with_suffix(".json"), 'w+') as f_out:
-        f_out.write(jsonrep)
 
 
 def main():
     """Main"""
-    # This module lives in contrib/peer_logging
-    # But should be run from the root directory.
-    # And should take basedir as an argument
-    basedir = pathlib.Path('peer_logging')
-    peerdirs = [peer for peer in basedir.iterdir() if (peer.is_dir() and peer.name != "__pycache__")]
-    for peerdir in peerdirs:
-        process_file(peerdir / "msgs_recv.dat")
-        process_file(peerdir / "msgs_sent.dat")
+    # Run with, say,  `python contrib/peer_logging/peer-logging-parser.py contrib/peer_logging/**/*.dat`
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument(
+        "logpaths", nargs='+',
+        help="binary message dump files to parse.")
+    # TODO: Give this an -o --out argument specifying the out file name
+    # Or, force it?  The last argument is the out file name?
+    # No.  Dangerous.
+    args = parser.parse_args()
+    logpaths = [Path(logpath).resolve() for logpath in args.logpaths]
 
+    messages = [] # type: List[Message]
+    for log in logpaths:
+        process_file(log, messages, "recv" in log.stem)
+
+    messages.sort(key=lambda msg: msg['time']) # Sorting after is faster
+
+    jsonrep = json.dumps(messages)
+    with open("output.json", 'w+') as f_out:
+        f_out.write(jsonrep)
 
 
 if __name__ == "__main__":
