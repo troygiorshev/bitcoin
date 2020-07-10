@@ -39,7 +39,6 @@ def to_jsonable(obj: Any) -> Any:
         ret = obj.hex()
     else:
         ret = obj
-    
     return ret
 
 
@@ -66,28 +65,29 @@ def process_file(path: Path, messages: List[Any], recv: bool) -> None:
 
 def main():
     """Main"""
-    # Run with, say,  `python contrib/peer_logging/peer-logging-parser.py contrib/peer_logging/**/*.dat`
+    # Run with, say, `python contrib/peer_logging/peer-logging-parser.py contrib/peer_logging/**/*.dat`
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
         "logpaths", nargs='+',
         help="binary message dump files to parse.")
-    # TODO: Give this an -o --out argument specifying the out file name
-    # Or, force it?  The last argument is the out file name?
-    # No.  Dangerous.
+    parser.add_argument("-o", "--output", help="output file.  If unset print to stdout")
     args = parser.parse_args()
     logpaths = [Path(logpath).resolve() for logpath in args.logpaths]
+    output = Path(args.output).resolve() if args.output else False
 
-    messages = [] # type: List[Message]
+    messages = [] # type: List[Any]
     for log in logpaths:
         process_file(log, messages, "recv" in log.stem)
 
     messages.sort(key=lambda msg: msg['time']) # Sorting after is faster
 
     jsonrep = json.dumps(messages)
-    with open("output.json", 'w+') as f_out:
-        f_out.write(jsonrep)
-
+    if output:
+        with open(output, 'w+') as f_out:
+            f_out.write(jsonrep)
+    else:
+        print(jsonrep)
 
 if __name__ == "__main__":
     main()
