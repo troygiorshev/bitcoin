@@ -2881,7 +2881,7 @@ void LogMessage_V1(CNetMessage msg)
     f.close();
 }
 
-void LogMessage(CNode* node, std::string command, std::vector<unsigned char> data, bool is_incoming)
+void LogMessage(CNode* node, std::string& command, std::vector<unsigned char>& data, bool is_incoming)
 {
     int64_t time = GetTimeMicros();
 

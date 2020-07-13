@@ -1017,6 +1017,6 @@ inline std::chrono::microseconds PoissonNextSend(std::chrono::microseconds now, 
 
 void LogMessage_V1(CNetMessage msg);
 
-void LogMessage(CNode* node, std::string command, std::vector<unsigned char> data, bool is_incoming);
+void LogMessage(CNode* node, std::string& command, std::vector<unsigned char>& data, bool is_incoming);
 
 #endif // BITCOIN_NET_H

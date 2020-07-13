@@ -65,7 +65,7 @@ def process_file(path: Path, messages: List[Any], recv: bool) -> None:
 
 def main():
     """Main"""
-    # Run with, say, `python contrib/peer_logging/peer-logging-parser.py contrib/peer_logging/**/*.dat`
+    # Run with, say, `python contrib/peer_logging/peer-logging-parser.py <data-dir>/peer_logging/**/*.dat`
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
