@@ -100,6 +100,10 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                             {RPCResult::Type::BOOL, "relaytxes", "Whether peer has asked us to relay transactions to it"},
                             {RPCResult::Type::NUM_TIME, "lastsend", "The " + UNIX_EPOCH_TIME + " of the last send"},
                             {RPCResult::Type::NUM_TIME, "lastrecv", "The " + UNIX_EPOCH_TIME + " of the last receive"},
+                            {RPCResult::Type::NUM, "time_socket_in", "The total time spent in the socket thread receiving messages"},
+                            {RPCResult::Type::NUM, "time_socket_out", "The total time spent in the socket thread sending messages"},
+                            {RPCResult::Type::NUM, "time_message_in", "The total time spent in the message thread receiving messages"},
+                            {RPCResult::Type::NUM, "time_message_out", "The total time spent in the message thread sending messages"},
                             {RPCResult::Type::NUM, "bytessent", "The total bytes sent"},
                             {RPCResult::Type::NUM, "bytesrecv", "The total bytes received"},
                             {RPCResult::Type::NUM_TIME, "conntime", "The " + UNIX_EPOCH_TIME + " of the connection"},
@@ -169,6 +173,10 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
         obj.pushKV("relaytxes", stats.fRelayTxes);
         obj.pushKV("lastsend", stats.nLastSend);
         obj.pushKV("lastrecv", stats.nLastRecv);
+        obj.pushKV("time_socket_in", stats.m_time_socket_in.count());
+        obj.pushKV("time_socket_out", stats.m_time_socket_out.count());
+        obj.pushKV("time_message_in", stats.m_time_message_in.count());
+        obj.pushKV("time_message_out", stats.m_time_message_out.count());
         obj.pushKV("bytessent", stats.nSendBytes);
         obj.pushKV("bytesrecv", stats.nRecvBytes);
         obj.pushKV("conntime", stats.nTimeConnected);

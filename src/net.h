@@ -648,6 +648,10 @@ public:
     // Bind address of our side of the connection
     CAddress addrBind;
     uint32_t m_mapped_as;
+    std::chrono::microseconds m_time_message_in;
+    std::chrono::microseconds m_time_message_out;
+    std::chrono::microseconds m_time_socket_in;
+    std::chrono::microseconds m_time_socket_out;
 };
 
 
@@ -951,6 +955,14 @@ public:
     std::atomic<bool> fPingQueued{false};
 
     std::set<uint256> orphan_work_set;
+
+    // Resource Tracking
+    RecursiveMutex cs_time_socket;
+    RecursiveMutex cs_time_message;
+    std::chrono::microseconds m_time_message_in GUARDED_BY(cs_time_message){0};
+    std::chrono::microseconds m_time_message_out GUARDED_BY(cs_time_message){0};
+    std::chrono::microseconds m_time_socket_in GUARDED_BY(cs_time_socket){0};
+    std::chrono::microseconds m_time_socket_out GUARDED_BY(cs_time_socket){0};
 
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress &addrBindIn, const std::string &addrNameIn, ConnectionType conn_type_in);
     ~CNode();

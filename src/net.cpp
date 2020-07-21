@@ -560,7 +560,16 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
     } else {
         stats.minFeeFilter = 0;
     }
-
+    {
+        LOCK(cs_time_socket);
+        X(m_time_socket_in);
+        X(m_time_socket_out);
+    }
+    {
+        LOCK(cs_time_message);
+        X(m_time_message_in);
+        X(m_time_message_out);
+    }
     // It is common for nodes with good ping times to suddenly become lagged,
     // due to a new block arriving or other large transfer.
     // Merely reporting pingtime might fool the caller into thinking the node was still responsive,
@@ -1392,17 +1401,23 @@ void CConnman::SocketHandler()
             // typical socket buffer is 8K-64K
             char pchBuf[0x10000];
             int nBytes = 0;
+            auto start = GetTime<std::chrono::microseconds>();
             {
                 LOCK(pnode->cs_hSocket);
                 if (pnode->hSocket == INVALID_SOCKET)
                     continue;
                 nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
             }
+            auto end = GetTime<std::chrono::microseconds>();
+            WITH_LOCK(pnode->cs_time_socket, pnode->m_time_socket_in += end - start);
             if (nBytes > 0)
             {
                 bool notify = false;
+                auto start = GetTime<std::chrono::microseconds>();
                 if (!pnode->ReceiveMsgBytes(pchBuf, nBytes, notify))
                     pnode->CloseSocketDisconnect();
+                auto end = GetTime<std::chrono::microseconds>();
+                WITH_LOCK(pnode->cs_time_socket, pnode->m_time_socket_in += end - start);
                 RecordBytesRecv(nBytes);
                 if (notify) {
                     size_t nSizeAdded = 0;
@@ -1449,7 +1464,10 @@ void CConnman::SocketHandler()
         if (sendSet)
         {
             LOCK(pnode->cs_vSend);
+            auto start = GetTime<std::chrono::microseconds>();
             size_t nBytes = SocketSendData(pnode);
+            auto end = GetTime<std::chrono::microseconds>();
+            WITH_LOCK(pnode->cs_time_socket, pnode->m_time_socket_out += end - start);
             if (nBytes) {
                 RecordBytesSent(nBytes);
             }
@@ -2103,14 +2121,22 @@ void CConnman::ThreadMessageHandler()
                 continue;
 
             // Receive messages
+            auto start = GetTime<std::chrono::microseconds>();
             bool fMoreNodeWork = m_msgproc->ProcessMessages(pnode, flagInterruptMsgProc);
+            auto end = GetTime<std::chrono::microseconds>();
+            WITH_LOCK(pnode->cs_time_message, pnode->m_time_message_in += end - start);
             fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
             if (flagInterruptMsgProc)
                 return;
             // Send messages
             {
                 LOCK(pnode->cs_sendProcessing);
+                // TODO: am I shadowing start and end here?
+                auto start = GetTime<std::chrono::microseconds>();
                 m_msgproc->SendMessages(pnode);
+                auto end = GetTime<std::chrono::microseconds>();
+                WITH_LOCK(pnode->cs_time_message, pnode->m_time_message_out += end - start); 
+                // TODO: Nested a lock, convince yourself this won't be a problem
             }
 
             if (flagInterruptMsgProc)
@@ -2899,6 +2925,10 @@ void CConnman::InitResourceLogging()
     f << "relaytxes,";
     f << "lastsend,";
     f << "lastrecv,";
+    f << "time_socket_in,";
+    f << "time_socket_out,";
+    f << "time_message_in,";
+    f << "time_message_out,";
     f << "bytessent,";
     f << "bytesrecv,";
     f << "conntime,";
@@ -2941,6 +2971,10 @@ void CConnman::LogResources(CNode& pnode)
     f << stats.fRelayTxes << ",";
     f << stats.nLastSend << ",";
     f << stats.nLastRecv << ",";
+    f << stats.m_time_socket_in.count() << ",";
+    f << stats.m_time_socket_out.count() << ",";
+    f << stats.m_time_message_in.count() << ",";
+    f << stats.m_time_message_out.count() << ",";
     f << stats.nSendBytes << ",";
     f << stats.nRecvBytes << ",";
     f << stats.nTimeConnected << ",";
