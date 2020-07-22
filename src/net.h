@@ -569,6 +569,7 @@ extern RecursiveMutex cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost GUARDED_BY(cs_mapLocalHost);
 
 extern const std::string NET_MESSAGE_COMMAND_OTHER;
+extern const std::string NET_MESSAGE_CORRUPT;
 typedef std::map<std::string, uint64_t> mapMsgCmdSize; //command, total bytes
 
 class CNodeStats
