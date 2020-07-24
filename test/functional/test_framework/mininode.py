@@ -283,9 +283,9 @@ class P2PInterface(P2PConnection):
     def __init__(self):
         super().__init__()
 
-        # Track number of messages of each type received and the most recent
-        # message of each type
-        self.message_count = defaultdict(int)
+        # Track the most recent message of each type.
+        # To wait for a message to be received, pop that message from
+        # this and use wait_until.
         self.last_message = {}
 
         # A count of the number of ping messages we've sent to the node
@@ -314,12 +314,10 @@ class P2PInterface(P2PConnection):
     def on_message(self, message):
         """Receive message and dispatch message to appropriate callback.
 
-        We keep a count of how many of each message type has been received
-        and the most recent message of each type."""
+        We keep track of the most recent message of each type."""
         with mininode_lock:
             try:
                 msgtype = message.msgtype.decode('ascii')
-                self.message_count[msgtype] += 1
                 self.last_message[msgtype] = message
                 getattr(self, 'on_' + msgtype)(message)
             except:
@@ -472,7 +470,7 @@ class P2PInterface(P2PConnection):
 
     def wait_for_verack(self, timeout=60):
         def test_function():
-            return self.message_count["verack"]
+            return "verack" in self.last_message
 
         self.wait_until(test_function, timeout=timeout)
 
