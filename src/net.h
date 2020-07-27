@@ -398,6 +398,10 @@ private:
     // Whether the node should be passed out in ForEach* callbacks
     static bool NodeFullyConnected(const CNode* pnode);
 
+    // Resource Logging
+    void InitResourceLogging();
+    void LogResources(CNode& pnode);
+
     // Network usage totals
     RecursiveMutex cs_totalBytesRecv;
     RecursiveMutex cs_totalBytesSent;

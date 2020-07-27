@@ -14,6 +14,7 @@
 #include <clientversion.h>
 #include <consensus/consensus.h>
 #include <crypto/sha256.h>
+#include <fs.h>
 #include <net_permissions.h>
 #include <netbase.h>
 #include <node/ui_interface.h>
@@ -2313,7 +2314,7 @@ bool CConnman::InitBinds(const std::vector<CService>& binds, const std::vector<N
 bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
 {
     Init(connOptions);
-
+    InitResourceLogging();
     {
         LOCK(cs_totalBytesRecv);
         nTotalBytesRecv = 0;
@@ -2502,6 +2503,7 @@ void CConnman::DeleteNode(CNode* pnode)
     if (fUpdateConnectionTime) {
         addrman.Connected(pnode->addr);
     }
+    LogResources(*pnode);
     delete pnode;
 }
 
@@ -2881,4 +2883,86 @@ uint64_t CConnman::CalculateKeyedNetGroup(const CAddress& ad) const
     std::vector<unsigned char> vchNetGroup(ad.GetGroup(addrman.m_asmap));
 
     return GetDeterministicRandomizer(RANDOMIZER_ID_NETGROUP).Write(vchNetGroup.data(), vchNetGroup.size()).Finalize();
+}
+
+void CConnman::InitResourceLogging()
+{
+    fs::path path = GetDataDir() / "resource.csv";
+    fsbridge::ofstream f;
+    f.open(path.c_str(), std::ios::app);
+    f << "id,";
+    f << "addr,";
+    f << "addrlocal,";
+    f << "addrbind,";
+    f << "mapped_as,";
+    f << "services,";
+    f << "relaytxes,";
+    f << "lastsend,";
+    f << "lastrecv,";
+    f << "bytessent,";
+    f << "bytesrecv,";
+    f << "conntime,";
+    f << "disconntime,";
+    f << "timeoffset,";
+    f << "pingtime,";
+    f << "minping,";
+    f << "pingwait,";
+    f << "version,";
+    f << "subver,";
+    f << "inbound,";
+    f << "addnode,";
+    f << "startingheight,";
+    f << "whitelisted,";
+    f << "permissions,";
+    f << "minfeefilter,";
+    for (const std::string& msg : getAllNetMessageTypes()){
+        f << "bytessent_" << msg << ",";
+    }
+    for (const std::string& msg : getAllNetMessageTypes()){
+        f << "bytesrecv_" << msg << ",";
+    }
+    f << "bytesrecv_other,";
+    f << '\n';
+}
+
+void CConnman::LogResources(CNode& pnode)
+{
+    fs::path path = GetDataDir() / "resource.csv";
+    fsbridge::ofstream f;
+    f.open(path.c_str(), std::ios::app);
+    CNodeStats stats;
+    pnode.copyStats(stats, addrman.m_asmap);
+    f << stats.nodeid << ",";
+    f << stats.addrName << ",";
+    f << stats.addrLocal << ",";
+    f << stats.addrBind.ToString() << ",";
+    f << stats.m_mapped_as << ",";
+    f << strprintf("%016x", stats.nServices) << ",";
+    f << stats.fRelayTxes << ",";
+    f << stats.nLastSend << ",";
+    f << stats.nLastRecv << ",";
+    f << stats.nSendBytes << ",";
+    f << stats.nRecvBytes << ",";
+    f << stats.nTimeConnected << ",";
+    f << GetSystemTimeInSeconds() << ",";
+    f << stats.nTimeOffset << ",";
+    f << stats.m_ping_usec << ",";
+    f << stats.m_min_ping_usec << ",";
+    f << stats.m_ping_wait_usec << ",";
+    f << stats.nVersion << ",";
+    f << stats.cleanSubVer << ",";
+    f << stats.fInbound << ",";
+    f << stats.m_manual_connection << ",";
+    f << stats.nStartingHeight << ",";
+    f << stats.m_legacyWhitelisted << ",";
+    f << stats.m_permissionFlags << ",";
+    f << stats.minFeeFilter << ",";
+    for (const std::string& msg : getAllNetMessageTypes()){
+            f << stats.mapSendBytesPerMsgCmd[msg] << ",";
+    }
+    for (const std::string& msg : getAllNetMessageTypes()){
+        f << stats.mapRecvBytesPerMsgCmd[msg] << ",";
+    }
+    f << stats.mapRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] << ",";
+    f << '\n';
 }
