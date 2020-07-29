@@ -274,8 +274,6 @@ struct CNodeState {
     int nMisbehavior;
     //! Whether this peer should be disconnected and marked as discouraged (unless it has the noban permission).
     bool m_should_discourage;
-    //! String name of this peer (debugging/logging purposes).
-    const std::string name;
     //! The best known block we know this peer has announced.
     const CBlockIndex *pindexBestKnownBlock;
     //! The hash of the last unknown block this peer has announced.
@@ -424,9 +422,8 @@ struct CNodeState {
     //! Whether this peer relays txs via wtxid
     bool m_wtxid_relay{false};
 
-    CNodeState(CAddress addrIn, std::string addrNameIn, bool is_inbound, bool is_manual) :
-        address(addrIn), name(std::move(addrNameIn)), m_is_inbound(is_inbound),
-        m_is_manual_connection (is_manual)
+    CNodeState(CAddress addrIn, bool is_inbound, bool is_manual) :
+        address(addrIn), m_is_inbound(is_inbound), m_is_manual_connection (is_manual)
     {
         fCurrentlyConnected = false;
         nMisbehavior = 0;
@@ -840,7 +837,7 @@ void PeerLogicValidation::InitializeNode(CNode *pnode) {
     NodeId nodeid = pnode->GetId();
     {
         LOCK(cs_main);
-        mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(nodeid), std::forward_as_tuple(addr, std::move(addrName), pnode->fInbound, pnode->m_manual_connection));
+        mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(nodeid), std::forward_as_tuple(addr, pnode->fInbound, pnode->m_manual_connection));
     }
     if(!pnode->fInbound)
         PushNodeVersion(*pnode, *connman, GetTime());
