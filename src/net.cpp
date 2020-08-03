@@ -2804,9 +2804,7 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
     size_t nBytesSent = 0;
     {
         LOCK(pnode->cs_vSend);
-        bool optimisticSend(pnode->vSendMsg.empty());
 
-        //log total amount of bytes per message type
         pnode->mapSendBytesPerMsgCmd[msg.m_type] += nTotalSize;
         pnode->nSendSize += nTotalSize;
 
@@ -2817,7 +2815,7 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
             pnode->vSendMsg.push_back(std::move(msg.data));
 
         // If write queue empty, attempt "optimistic write"
-        if (optimisticSend == true)
+        if (pnode->vSendMsg.empty())
             nBytesSent = SocketSendData(pnode);
     }
     if (nBytesSent)
