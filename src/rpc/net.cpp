@@ -106,6 +106,8 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                             {RPCResult::Type::NUM, "time_message_out", "The total time spent in the message thread sending messages"},
                             {RPCResult::Type::NUM, "bytessent", "The total bytes sent"},
                             {RPCResult::Type::NUM, "bytesrecv", "The total bytes received"},
+                            {RPCResult::Type::NUM, "msgssent", "The total number of messages sent"},
+                            {RPCResult::Type::NUM, "msgsrecv", "The total number of messages received"},
                             {RPCResult::Type::NUM_TIME, "conntime", "The " + UNIX_EPOCH_TIME + " of the connection"},
                             {RPCResult::Type::NUM, "timeoffset", "The time offset in seconds"},
                             {RPCResult::Type::NUM, "pingtime", "ping time (if available)"},
@@ -136,6 +138,18 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                                 {RPCResult::Type::NUM, "msg", "The total bytes received aggregated by message type\n"
                                                               "When a message type is not listed in this json object, the bytes received are 0.\n"
                                                               "Only known message types can appear as keys in the object and all bytes received of unknown message types are listed under '"+NET_MESSAGE_COMMAND_OTHER+"'."}
+                            }},
+                            {RPCResult::Type::OBJ_DYN, "num_sent_per_msg", "",
+                            {
+                                {RPCResult::Type::NUM, "msg", "The total number of messages sent aggregated by message type\n"
+                                                              "When a message type is not listed in this json object, the number sent are 0.\n"
+                                                              "Only known message types can appear as keys in the object."}
+                            }},
+                            {RPCResult::Type::OBJ, "num_recv_per_msg", "",
+                            {
+                                {RPCResult::Type::NUM, "msg", "The total bytes received aggregated by message type\n"
+                                                              "When a message type is not listed in this json object, the number received are 0.\n"
+                                                              "Only known message types can appear as keys in the object and the number received of unknown message types are listed under '"+NET_MESSAGE_COMMAND_OTHER+"'."}
                             }},
                         }},
                     }},
@@ -232,6 +246,20 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                 recvPerMsgCmd.pushKV(i.first, i.second);
         }
         obj.pushKV("bytesrecv_per_msg", recvPerMsgCmd);
+
+        UniValue num_sent_per_msg_type(UniValue::VOBJ);
+        for (const auto& i : stats.m_num_sent_per_msg_type) {
+            if (i.second > 0)
+                num_sent_per_msg_type.pushKV(i.first, i.second);
+        }
+        obj.pushKV("num_sent_per_msg", num_sent_per_msg_type);
+
+        UniValue num_recv_per_msg_type(UniValue::VOBJ);
+        for (const auto& i : stats.m_num_recv_per_msg_type) {
+            if (i.second > 0)
+                num_recv_per_msg_type.pushKV(i.first, i.second);
+        }
+        obj.pushKV("num_recv_per_msg", num_recv_per_msg_type);
 
         ret.push_back(obj);
     }

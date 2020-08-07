@@ -546,11 +546,15 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
         LOCK(cs_vSend);
         X(mapSendBytesPerMsgCmd);
         X(nSendBytes);
+        X(m_num_msgs_sent);
+        X(m_num_sent_per_msg_type);
     }
     {
         LOCK(cs_vRecv);
         X(mapRecvBytesPerMsgCmd);
         X(nRecvBytes);
+        X(m_num_msgs_recv);
+        X(m_num_recv_per_msg_type);
     }
     X(m_legacyWhitelisted);
     X(m_permissionFlags);
@@ -613,11 +617,19 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
 
             //store received bytes per message command
             //to prevent a memory DOS, only allow valid commands
-            mapMsgCmdSize::iterator i = mapRecvBytesPerMsgCmd.find(msg.m_command);
+            mapIntByMsgType::iterator i = mapRecvBytesPerMsgCmd.find(msg.m_command);
             if (i == mapRecvBytesPerMsgCmd.end())
                 i = mapRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
             assert(i != mapRecvBytesPerMsgCmd.end());
             i->second += msg.m_raw_message_size;
+
+            mapIntByMsgType::iterator j = m_num_recv_per_msg_type.find(msg.m_command);
+            if (j == m_num_recv_per_msg_type.end())
+                j = m_num_recv_per_msg_type.find(NET_MESSAGE_COMMAND_OTHER);
+            assert(j != m_num_recv_per_msg_type.end());
+            j->second++;
+
+            m_num_msgs_recv++;
 
             // push the message to the process queue,
             vRecvMsg.push_back(std::move(msg));
@@ -2813,9 +2825,12 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
         m_addr_known = MakeUnique<CRollingBloomFilter>(5000, 0.001);
     }
 
-    for (const std::string &msg : getAllNetMessageTypes())
+    for (const std::string &msg : getAllNetMessageTypes()){
         mapRecvBytesPerMsgCmd[msg] = 0;
+        m_num_recv_per_msg_type[msg] = 0;
+    }
     mapRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
+    m_num_recv_per_msg_type[NET_MESSAGE_COMMAND_OTHER] = 0;
 
     if (fLogIPs) {
         LogPrint(BCLog::NET, "Added connection to %s peer=%d\n", addrName, id);
@@ -2852,9 +2867,10 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
         LOCK(pnode->cs_vSend);
         bool optimisticSend(pnode->vSendMsg.empty());
 
-        //log total amount of bytes per message type
         pnode->mapSendBytesPerMsgCmd[msg.m_type] += nTotalSize;
         pnode->nSendSize += nTotalSize;
+        pnode->m_num_sent_per_msg_type[msg.m_type]++;
+        pnode->m_num_msgs_sent++;
 
         if (pnode->nSendSize > nSendBufferMaxSize)
             pnode->fPauseSend = true;
@@ -2931,6 +2947,8 @@ void CConnman::InitResourceLogging()
     f << "time_message_out,";
     f << "bytessent,";
     f << "bytesrecv,";
+    f << "msgssent,";
+    f << "msgsrecv,";
     f << "conntime,";
     f << "disconntime,";
     f << "timeoffset,";
@@ -2952,6 +2970,13 @@ void CConnman::InitResourceLogging()
         f << "bytesrecv_" << msg << ",";
     }
     f << "bytesrecv_other,";
+    for (const std::string &msg : getAllNetMessageTypes()){
+        f << "num_sent_" << msg << ",";
+    }
+    for (const std::string &msg : getAllNetMessageTypes()){
+        f << "num_recv_" << msg << ",";
+    }
+    f << "num_recv_other";
     f << '\n';
 }
 
@@ -2977,6 +3002,8 @@ void CConnman::LogResources(CNode& pnode)
     f << stats.m_time_message_out.count() << ",";
     f << stats.nSendBytes << ",";
     f << stats.nRecvBytes << ",";
+    f << stats.m_num_msgs_sent << ",";
+    f << stats.m_num_msgs_recv << ",";
     f << stats.nTimeConnected << ",";
     f << GetSystemTimeInSeconds() << ",";
     f << stats.nTimeOffset << ",";
@@ -2998,5 +3025,12 @@ void CConnman::LogResources(CNode& pnode)
         f << stats.mapRecvBytesPerMsgCmd[msg] << ",";
     }
     f << stats.mapRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] << ",";
+    for (const std::string &msg : getAllNetMessageTypes()){
+        f << stats.m_num_sent_per_msg_type[msg] << ",";
+    }
+    for (const std::string &msg : getAllNetMessageTypes()){
+        f << stats.m_num_recv_per_msg_type[msg] << ",";
+    }
+    f << stats.m_num_recv_per_msg_type[NET_MESSAGE_COMMAND_OTHER] << ",";
     f << '\n';
 }

@@ -613,7 +613,7 @@ extern RecursiveMutex cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost GUARDED_BY(cs_mapLocalHost);
 
 extern const std::string NET_MESSAGE_COMMAND_OTHER;
-typedef std::map<std::string, uint64_t> mapMsgCmdSize; //command, total bytes
+typedef std::map<std::string, uint64_t> mapIntByMsgType;
 
 class CNodeStats
 {
@@ -632,9 +632,13 @@ public:
     bool m_manual_connection;
     int nStartingHeight;
     uint64_t nSendBytes;
-    mapMsgCmdSize mapSendBytesPerMsgCmd;
+    mapIntByMsgType mapSendBytesPerMsgCmd;
     uint64_t nRecvBytes;
-    mapMsgCmdSize mapRecvBytesPerMsgCmd;
+    mapIntByMsgType mapRecvBytesPerMsgCmd;
+    uint64_t m_num_msgs_recv;
+    mapIntByMsgType m_num_recv_per_msg_type;
+    uint64_t m_num_msgs_sent;
+    mapIntByMsgType m_num_sent_per_msg_type;
     NetPermissionFlags m_permissionFlags;
     bool m_legacyWhitelisted;
     int64_t m_ping_usec;
@@ -883,8 +887,8 @@ public:
     }
 
 protected:
-    mapMsgCmdSize mapSendBytesPerMsgCmd;
-    mapMsgCmdSize mapRecvBytesPerMsgCmd GUARDED_BY(cs_vRecv);
+    mapIntByMsgType mapSendBytesPerMsgCmd;
+    mapIntByMsgType mapRecvBytesPerMsgCmd GUARDED_BY(cs_vRecv);
 
 public:
     uint256 hashContinue;
@@ -963,6 +967,11 @@ public:
     std::chrono::microseconds m_time_message_out GUARDED_BY(cs_time_message){0};
     std::chrono::microseconds m_time_socket_in GUARDED_BY(cs_time_socket){0};
     std::chrono::microseconds m_time_socket_out GUARDED_BY(cs_time_socket){0};
+
+    uint64_t m_num_msgs_recv GUARDED_BY(cs_vRecv){0};
+    mapIntByMsgType m_num_recv_per_msg_type GUARDED_BY(cs_vRecv);
+    uint64_t m_num_msgs_sent GUARDED_BY(cs_vSend){0};
+    mapIntByMsgType m_num_sent_per_msg_type GUARDED_BY(cs_vSend);
 
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress &addrBindIn, const std::string &addrNameIn, ConnectionType conn_type_in);
     ~CNode();
