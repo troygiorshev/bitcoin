@@ -2023,6 +2023,12 @@ void static ProcessOrphanTx(CConnman& connman, CTxMemPool& mempool, std::set<uin
 
         if (setMisbehaving.count(fromPeer)) continue;
         if (AcceptToMemoryPool(mempool, orphan_state, porphanTx, &removed_txn, false /* bypass_limits */, 0 /* nAbsurdFee */)) {
+            connman.ForNode(fromPeer, [&](CNode* pnode) {
+                    LOCK(pnode->cs_tx_count);
+                    pnode->m_num_pending_orphans--;
+                    pnode->m_num_accepted_txs++;
+                    return true;
+            });
             LogPrint(BCLog::MEMPOOL, "   accepted orphan tx %s\n", orphanHash.ToString());
             RelayTransaction(orphanHash, porphanTx->GetWitnessHash(), connman);
             for (unsigned int i = 0; i < orphanTx.vout.size(); i++) {
@@ -2048,6 +2054,12 @@ void static ProcessOrphanTx(CConnman& connman, CTxMemPool& mempool, std::set<uin
             }
             // Has inputs but not accepted to mempool
             // Probably non-standard or insufficient fee
+            connman.ForNode(fromPeer, [&](CNode* pnode) {
+                    LOCK(pnode->cs_tx_count);
+                    pnode->m_num_pending_orphans--;
+                    pnode->m_num_rejected_txs++;
+                    return true;
+            });
             LogPrint(BCLog::MEMPOOL, "   removed orphan tx %s\n", orphanHash.ToString());
             if (orphan_state.GetResult() != TxValidationResult::TX_WITNESS_STRIPPED) {
                 // We can add the wtxid of this transaction to our reject filter.
@@ -2928,6 +2940,7 @@ void ProcessMessage(
         // 2) This peer is a block-relay-only peer
         if ((!g_relay_txes && !pfrom.HasPermission(PF_RELAY)) || (pfrom.m_tx_relay == nullptr))
         {
+            WITH_LOCK(pfrom.cs_tx_count, pfrom.m_num_rejected_txs++);
             LogPrint(BCLog::NET, "transaction sent in violation of protocol peer=%d\n", pfrom.GetId());
             pfrom.fDisconnect = true;
             return;
@@ -2978,6 +2991,7 @@ void ProcessMessage(
         // (older than our recency filter) if trying to DoS us, without any need
         // for witness malleation.
         if (AlreadyHave(CInv(MSG_WTX, wtxid), mempool)) {
+            WITH_LOCK(pfrom.cs_tx_count, pfrom.m_num_notprocessed_txs++);
             if (pfrom.HasPermission(PF_FORCERELAY)) {
                 // Always relay transactions received from peers with forcerelay
                 // permission, even if they were already in the mempool, allowing
@@ -3002,7 +3016,7 @@ void ProcessMessage(
             }
 
             pfrom.nLastTXTime = GetTime();
-
+            WITH_LOCK(pfrom.cs_tx_count, pfrom.m_num_accepted_txs++);
             LogPrint(BCLog::MEMPOOL, "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n",
                 pfrom.GetId(),
                 tx.GetHash().ToString(),
@@ -3045,6 +3059,7 @@ void ProcessMessage(
                     pfrom.AddKnownTx(parent_txid);
                     if (!AlreadyHave(_inv, mempool)) RequestTx(State(pfrom.GetId()), ToGenTxid(_inv), current_time);
                 }
+                WITH_LOCK(pfrom.cs_tx_count, pfrom.m_num_pending_orphans++);
                 AddOrphanTx(ptx, pfrom.GetId());
 
                 // DoS prevention: do not allow mapOrphanTransactions to grow unbounded (see CVE-2012-3789)
@@ -3121,6 +3136,7 @@ void ProcessMessage(
         // regardless of false positives.
 
         if (state.IsInvalid()) {
+            WITH_LOCK(pfrom.cs_tx_count, pfrom.m_num_rejected_txs++);
             LogPrint(BCLog::MEMPOOLREJ, "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(),
                 pfrom.GetId(),
                 state.ToString());

@@ -556,6 +556,13 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
         X(m_num_msgs_recv);
         X(m_num_recv_per_msg_type);
     }
+    {
+        LOCK(cs_tx_count);
+        X(m_num_accepted_txs);
+        X(m_num_rejected_txs);
+        X(m_num_pending_orphans);
+        X(m_num_notprocessed_txs);
+    }
     X(m_legacyWhitelisted);
     X(m_permissionFlags);
     if (m_tx_relay != nullptr) {
@@ -2949,6 +2956,10 @@ void CConnman::InitResourceLogging()
     f << "bytesrecv,";
     f << "msgssent,";
     f << "msgsrecv,";
+    f << "txsaccepted,";
+    f << "txsrejected,";
+    f << "txspendingorphan,";
+    f << "txsnotprocessed,";
     f << "conntime,";
     f << "disconntime,";
     f << "timeoffset,";
@@ -3004,6 +3015,10 @@ void CConnman::LogResources(CNode& pnode)
     f << stats.nRecvBytes << ",";
     f << stats.m_num_msgs_sent << ",";
     f << stats.m_num_msgs_recv << ",";
+    f << stats.m_num_accepted_txs << ",";
+    f << stats.m_num_rejected_txs << ",";
+    f << stats.m_num_pending_orphans << ",";
+    f << stats.m_num_notprocessed_txs << ",";
     f << stats.nTimeConnected << ",";
     f << GetSystemTimeInSeconds() << ",";
     f << stats.nTimeOffset << ",";

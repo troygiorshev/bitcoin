@@ -639,6 +639,10 @@ public:
     mapIntByMsgType m_num_recv_per_msg_type;
     uint64_t m_num_msgs_sent;
     mapIntByMsgType m_num_sent_per_msg_type;
+    uint64_t m_num_accepted_txs;
+    uint64_t m_num_rejected_txs;
+    uint64_t m_num_pending_orphans;
+    uint64_t m_num_notprocessed_txs;
     NetPermissionFlags m_permissionFlags;
     bool m_legacyWhitelisted;
     int64_t m_ping_usec;
@@ -967,6 +971,11 @@ public:
     std::chrono::microseconds m_time_message_out GUARDED_BY(cs_time_message){0};
     std::chrono::microseconds m_time_socket_in GUARDED_BY(cs_time_socket){0};
     std::chrono::microseconds m_time_socket_out GUARDED_BY(cs_time_socket){0};
+    RecursiveMutex cs_tx_count;
+    uint64_t m_num_accepted_txs GUARDED_BY(cs_tx_count){0};
+    uint64_t m_num_rejected_txs GUARDED_BY(cs_tx_count){0};
+    uint64_t m_num_pending_orphans GUARDED_BY(cs_tx_count){0};
+    uint64_t m_num_notprocessed_txs GUARDED_BY(cs_tx_count){0};
 
     uint64_t m_num_msgs_recv GUARDED_BY(cs_vRecv){0};
     mapIntByMsgType m_num_recv_per_msg_type GUARDED_BY(cs_vRecv);
