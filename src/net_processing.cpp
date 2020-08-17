@@ -3013,8 +3013,6 @@ void ProcessMessage(
         }
         else if (state.GetResult() == TxValidationResult::TX_MISSING_INPUTS)
         {
-            bool fRejectedParents = false; // It may be the case that the orphans parents have all been rejected
-
             // Deduplicate parent txids, so that we don't have to loop over
             // the same parent txid more than once down below.
             std::vector<uint256> unique_parents;
@@ -3025,6 +3023,8 @@ void ProcessMessage(
             }
             std::sort(unique_parents.begin(), unique_parents.end());
             unique_parents.erase(std::unique(unique_parents.begin(), unique_parents.end()), unique_parents.end());
+            // It may be the case that at least one of the orphan's parents has been rejected
+            bool fRejectedParents = false;
             for (const uint256& parent_txid : unique_parents) {
                 if (recentRejects->contains(parent_txid)) {
                     fRejectedParents = true;
